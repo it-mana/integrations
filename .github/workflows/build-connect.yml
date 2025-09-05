@@ -102,7 +102,7 @@ jobs:
   installer-windows:
     name: Build Connect Installer on Windows
     needs: [set-variables, connect-build]
-    runs-on: windows-latest
+    runs-on: self-hosted-windows
     env:
       CODESIGN: "True" # Set this to 'True' or 'False' as needed
     steps:

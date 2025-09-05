@@ -1,11 +1,12 @@
 # :coding: utf-8
 # :copyright: Copyright (c) 2014-2023 ftrack
 
-import os
 import logging
-import qtawesome as qta
+import os
 import re
 import sys
+
+import qtawesome as qta
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +90,7 @@ DEPRECATED_PLUGINS = [
 
 # ftrack integrations repo URL from were to discover and download plugins
 DEFAULT_INTEGRATIONS_REPO_URL = (
-    'https://api.github.com/repos/ftrackhq/integrations'
+    'https://api.github.com/repos/it-mana/integrations'
 )
 
 
@@ -129,9 +130,7 @@ def set_up_certificates():
         # If the application is run as a bundle, the pyInstaller bootloader
         # extends the sys module by a flag frozen=True and sets the app
         # path into variable _MEIPASS.
-        connect_cert_dir = os.path.join(
-            sys._MEIPASS, "ftrack_connect", "certs"
-        )
+        connect_cert_dir = os.path.join(sys._MEIPASS, "ftrack_connect", "certs")
 
         # Set the path to certificate file in resource folder. This allows requests
         # module to read it outside frozen zip file.
