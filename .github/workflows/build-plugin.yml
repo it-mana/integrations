@@ -19,7 +19,7 @@ jobs:
           echo "TAG_NAME=${TAG_NAME}"
 
           # Define an array of supported tag prefixes
-          SUPPORTED_TAG_PREFIXES=("connect-publisher-widget/" "connect-mana-location/")
+          SUPPORTED_TAG_PREFIXES=("connect-publisher-widget/")
 
           # Initialize match flag as false
           MATCH_FOUND=false
@@ -106,11 +106,6 @@ jobs:
           pip install -r tools/requirements.txt
           # Use --testpypi or --from_source to change where the deps are picked from
           python tools/build.py --remove_intermediate_folder build_connect_plugin ${{ needs.set-variables.outputs.folder }}
-      - name: build mana connect plugin
-        if: ${{ needs.set-variables.outputs.package == 'connect-mana-location' }}
-        shell: bash
-        run: |
-          python ${{ needs.set-variables.outputs.folder }}/setup.py build_plugin
       - name: upload artifacts to release
         shell: bash
         run: |
@@ -124,3 +119,37 @@ jobs:
         with:
           name: dist
           path: ${{ needs.set-variables.outputs.folder }}/dist
+
+  build-windows:
+    name: Build Windows platform dependent artifacts
+    needs: set-variables
+    concurrency:
+      group: ci-${{ github.ref }}
+    if: ${{ needs.set-variables.outputs.package == 'framework-blender' }}
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - name: install poetry
+        shell: bash
+        run: |
+          pip install poetry==1.5.1
+      - name: poetry build
+        shell: bash
+        run: |
+          cd ${{ needs.set-variables.outputs.folder }}
+          poetry build
+      - name: build standard framework DCC integration plugin
+        shell: bash
+        run: |
+          pip install -r tools/requirements-pyside6.txt
+          python tools/build.py --remove_intermediate_folder --platform_dependent --include_resources resource/bootstrap build_connect_plugin ${{ needs.set-variables.outputs.folder }}
+      - name: upload artifacts to release
+        shell: bash
+        run: |
+          cd ${{ needs.set-variables.outputs.folder }}
+          gh release upload ${{ needs.set-variables.outputs.tag }} dist/*  --clobber
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
