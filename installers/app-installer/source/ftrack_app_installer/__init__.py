@@ -188,7 +188,7 @@ class WindowsAppInstaller(AppInstaller):
         ), f'Inno Setup failed to build installer! Exitcode: {return_code}'
 
         installer_path = os.path.join(
-            self.dist_path, f"ftrack_connect-{self.version}-win64.exe"
+            self.dist_path, f"ftrack-{self.version}-win64.exe"
         )
         if not os.path.exists(installer_path):
             raise Exception(
