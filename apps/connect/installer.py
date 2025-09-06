@@ -1,17 +1,17 @@
 # :coding: utf-8
 # :copyright: Copyright (c) 2024 ftrack
 
+import argparse
+import logging
 import os
 import sys
-import logging
-import argparse
 
-from ftrack_utils.version import get_version
 from ftrack_app_installer import (
-    WindowsAppInstaller,
-    MacOSAppInstaller,
     LinuxAppInstaller,
+    MacOSAppInstaller,
+    WindowsAppInstaller,
 )
+from ftrack_utils.version import get_version
 
 
 def setup_installer(bundle_name, version, root_path, entry_file):
@@ -65,7 +65,7 @@ def main():
 
     args = parser.parse_args(arguments)
 
-    bundle_name = "ftrack Connect"
+    bundle_name = "Ftrack"
     version = get_version("ftrack_connect", os.path.dirname(__file__))
     root_path = os.path.dirname(os.path.abspath(__file__))
     entry_file = os.path.join(root_path, "source/ftrack_connect/__main__.py")

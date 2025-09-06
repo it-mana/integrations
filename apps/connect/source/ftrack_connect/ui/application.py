@@ -1,64 +1,59 @@
 # :coding: utf-8
 # :copyright: Copyright (c) 2014-2023 ftrack
 import copy
+import logging
 import os
 import platform
 import sys
-import requests
-import requests.exceptions
+import time
 import uuid
-import logging
 import weakref
 from operator import itemgetter
-import time
-import qtawesome as qta
 
 import ftrack_api
 import ftrack_api._centralized_storage_scenario
 import ftrack_api.event.base
-
+import qtawesome as qta
+import requests
+import requests.exceptions
 from ftrack_utils.usage import (
-    set_usage_tracker,
-    get_usage_tracker,
     UsageTracker,
+    get_usage_tracker,
+    set_usage_tracker,
 )
 
 try:
-    from PySide6 import QtWidgets, QtCore, QtGui
+    from PySide6 import QtCore, QtGui, QtWidgets
     from PySide6.QtGui import QAction
 except ImportError:
     from PySide2 import QtWidgets, QtCore, QtGui
     from PySide2.QtWidgets import QAction
 
-from ftrack_connect import load_fonts_resource
 import ftrack_connect
-import ftrack_connect.event_hub_thread as _event_hub_thread
 import ftrack_connect.error
-from ftrack_connect.utils.plugin import (
-    get_default_plugin_directory,
-    get_plugins_from_path,
-    get_plugin_data,
-    PLUGIN_DIRECTORIES,
-)
-from ftrack_connect.utils.credentials import (
-    load_credentials,
-    store_credentials,
-)
-from ftrack_connect.utils.directory import open_directory
+import ftrack_connect.event_hub_thread as _event_hub_thread
 import ftrack_connect.ui.theme
 import ftrack_connect.ui.widget.overlay
-from ftrack_connect.ui.widget import uncaught_error as _uncaught_error
-from ftrack_connect.ui.widget import tab_widget as _tab_widget
-from ftrack_connect.ui.widget import login as _login
-from ftrack_connect.ui.widget import about as _about
-from ftrack_connect.ui import login_tools as _login_tools
-from ftrack_connect.ui.widget import configure_scenario as _scenario_widget
 import ftrack_connect.utils.log
+from ftrack_connect import load_fonts_resource
 from ftrack_connect.application_launcher.discover_applications import (
     DiscoverApplications,
 )
-
-from ftrack_connect.utils.plugin import create_target_plugin_directory
+from ftrack_connect.ui import login_tools as _login_tools
+from ftrack_connect.ui.widget import about as _about
+from ftrack_connect.ui.widget import configure_scenario as _scenario_widget
+from ftrack_connect.ui.widget import login as _login
+from ftrack_connect.ui.widget import tab_widget as _tab_widget
+from ftrack_connect.ui.widget import uncaught_error as _uncaught_error
+from ftrack_connect.utils.credentials import load_credentials, store_credentials
+from ftrack_connect.utils.directory import open_directory
+from ftrack_connect.utils.plugin import (
+    PLUGIN_DIRECTORIES,
+    create_target_plugin_directory,
+    get_default_plugin_directory,
+    get_plugin_data,
+    get_plugins_from_path,
+)
 
 
 class ConnectWidgetPlugin(object):
@@ -83,9 +78,7 @@ class ConnectWidgetPlugin(object):
         '''register a new connect widget with given **priority**.'''
         session.event_hub.subscribe(
             'topic={0} '
-            'and source.user.username={1}'.format(
-                self.topic, session.api_user
-            ),
+            'and source.user.username={1}'.format(self.topic, session.api_user),
             self._return_widget,
             priority=priority,
         )
@@ -205,7 +198,7 @@ class Application(QtWidgets.QMainWindow):
         self._application_launcher = None
 
         self.setObjectName('ftrack-connect-window')
-        self.setWindowTitle('ftrack Connect')
+        self.setWindowTitle('Ftrack')
         self.resize(450, 700)
         self.move(50, 50)
 
@@ -514,9 +507,7 @@ class Application(QtWidgets.QMainWindow):
         self._hub_thread.start(session)
         weakref.finalize(self._hub_thread, self._hub_thread.cleanup)
 
-        ftrack_api._centralized_storage_scenario.register_configuration(
-            session
-        )
+        ftrack_api._centralized_storage_scenario.register_configuration(session)
 
         # Initialize UsageTracker for connect
         set_usage_tracker(
@@ -1012,9 +1003,7 @@ class Application(QtWidgets.QMainWindow):
 
         if registered_plugin is None:
             self.logger.warning(
-                'No plugin registered with identifier "{0}".'.format(
-                    identifier
-                )
+                'No plugin registered with identifier "{0}".'.format(identifier)
             )
             return
 
@@ -1060,9 +1049,9 @@ class Application(QtWidgets.QMainWindow):
 
         # Provide debug information from application launcher
         if self._application_launcher:
-            debug_information[
-                'application_launcher'
-            ] = self._application_launcher.get_debug_information()
+            debug_information['application_launcher'] = (
+                self._application_launcher.get_debug_information()
+            )
 
         # Provide information from builtin widget plugins.
         for plugin in self._widget_plugin_instances:

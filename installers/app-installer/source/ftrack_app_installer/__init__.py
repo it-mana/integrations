@@ -1,16 +1,15 @@
 # :coding: utf-8
 # :copyright: Copyright (c) 2024 ftrack
 
-import subprocess
-import os
-import re
-import logging
 import json
+import logging
+import os
 import plistlib
-import requests.certs
+import re
+import subprocess
 
 import PyInstaller.__main__
-
+import requests.certs
 
 VERSION_TEMPLATE = '''
 # :coding: utf-8
@@ -90,6 +89,8 @@ class AppInstaller(object):
             'ftrack_action_handler',
             '--collect-all',
             'riffle',
+            '--exclude-module',
+            'numpy',
             '--icon',
             self.icon_path,
             '--distpath',
@@ -158,12 +159,12 @@ class WindowsAppInstaller(AppInstaller):
 
         # Load template and inject data
         with open(
-            os.path.join(self.os_root_folder, 'ftrack Connect.iss'),
+            os.path.join(self.os_root_folder, 'Ftrack.iss'),
             "r",
         ) as f_template:
             template = f_template.read()
             temp_iss_path = os.path.join(
-                self.build_path, "installer", 'ftrack Connect.iss'
+                self.build_path, "installer", 'Ftrack.iss'
             )
             if not os.path.exists(os.path.dirname(temp_iss_path)):
                 os.makedirs(os.path.dirname(temp_iss_path))
@@ -393,9 +394,9 @@ class MacOSAppInstaller(AppInstaller):
                 plist = plistlib.load(fp)
 
             # Set copyright
-            plist[
-                "CFBundleGetInfoString"
-            ] = f'{self.bundle_name} {self.version}, copyright: Copyright (c) 2024 ftrack'
+            plist["CFBundleGetInfoString"] = (
+                f'{self.bundle_name} {self.version}, copyright: Copyright (c) 2024 ftrack'
+            )
             # Set the desired version
             plist['CFBundleShortVersionString'] = self.version
 
@@ -457,9 +458,7 @@ class LinuxAppInstaller(AppInstaller):
             checksum_path = f'{target_path}.md5'
             if os.path.exists(checksum_path):
                 os.unlink(checksum_path)
-            logging.info(
-                f'Created: {target_path}, calculating md5 checksum...'
-            )
+            logging.info(f'Created: {target_path}, calculating md5 checksum...')
             return_code = os.system(f'md5sum {target_path} > {checksum_path}')
             assert return_code == 0, f'md5 failed: {return_code}'
             logging.info(f'Checksum created: {checksum_path}')

@@ -7,7 +7,7 @@ Library that provides support to build and codesign ftrack applications.
 1. Clone the public ftrack integrations repository:
 
 ```bash
-    $ git clone https://github.com/ftrackhq/integrations.git
+    $ git clone https://github.com/it-mana/integrations.git
 ```
 
 2. Make sure you are in a virtual enviroment
@@ -45,24 +45,21 @@ Library that provides support to build and codesign ftrack applications.
 ### Windows notes:
 
 - Make sure you have Inno Setup installed: https://jrsoftware.org/isinfo.php
--  Install Java
--  Install Google cloud CLI: https://cloud.google.com/sdk/docs/install
+- Install Java
+- Install Google cloud CLI: https://cloud.google.com/sdk/docs/install
 - Make sure you have the right permissions to codesgin an ftrack app.
 
 ### MacOs notes:
 
 - Install appdmg to be able to create the dmg: ( appdmg fails on M1 )
 
-
-    $ npm install -g appdmg
-
+  $ npm install -g appdmg
 
 - On latest version of OSX these envs are needed in order to properly
-build:
+  build:
 
-
-    $ export CPPFLAGS=-I/usr/local/opt/openssl/include
-    $ export LDFLAGS=-L/usr/local/opt/openssl/lib
+      $ export CPPFLAGS=-I/usr/local/opt/openssl/include
+      $ export LDFLAGS=-L/usr/local/opt/openssl/lib
 
 Make sure you have the certificate installed in your keychain.
 
@@ -79,10 +76,8 @@ To notarize you will also need to setup the following variables:
     $ export PROD_MACOS_NOTARIZATION_TEAM_ID="<your_team_id>"
     $ export PROD_MACOS_NOTARIZATION_PWD="<your_app-specific_password>"
 
-
 ### Linux notes:
 
 - Install patchelf platform dependent package
 
-    $ pip install patchelf
-
+  $ pip install patchelf

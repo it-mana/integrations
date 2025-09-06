@@ -1,21 +1,21 @@
 # :coding: utf-8
 # :copyright: Copyright (c) 2014-2023 ftrack
-import os
 import json
+import os
+import platform
 import sys
 import textwrap
-import platform
+
 import ftrack_api
 
 try:
-    from PySide6 import QtWidgets, QtCore, QtGui, __version__ as QtVersion
+    from PySide6 import QtCore, QtGui, QtWidgets
+    from PySide6 import __version__ as QtVersion
 except ImportError:
     from PySide2 import QtWidgets, QtCore, QtGui, __version__ as QtVersion
 
-
-from ftrack_connect.utils.log import get_log_directory
-
 from ftrack_connect.utils.directory import open_directory
+from ftrack_connect.utils.log import get_log_directory
 from ftrack_connect.utils.plugin import PLUGIN_DIRECTORIES
 
 
@@ -146,8 +146,8 @@ class AboutDialog(QtWidgets.QDialog):
         Type=Application
         Version=1.0
         Icon={0}/logo.svg
-        Name=ftrack Connect
-        Comment=ftrack Connect
+        Name=Ftrack
+        Comment=Ftrack
         Exec="{0}/{1}"
         StartupNotify=true
         Terminal=false
