@@ -91,12 +91,12 @@ jobs:
         with:
           python-version: "3.11"
       - name: install poetry
-        if: ${{ needs.set-variables.outputs.package != 'connect-publisher-widget' }}
+        if: ${{ needs.set-variables.outputs.package != 'connect-mana-location' }}
         shell: bash
         run: |
           pip install poetry==1.5.1
       - name: poetry build
-        if: ${{ needs.set-variables.outputs.package != 'connect-publisher-widget' }}
+        if: ${{ needs.set-variables.outputs.package != 'connect-mana-location' }}
         shell: bash
         run: |
           cd ${{ needs.set-variables.outputs.folder }}
