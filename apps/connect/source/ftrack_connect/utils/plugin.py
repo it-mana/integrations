@@ -1,22 +1,17 @@
 # :coding: utf-8
 # :copyright: Copyright (c) 2014-2023 ftrack
 
-import os
+import glob
 import logging
+import os
 import re
 import sys
-import requests
-import glob
 
 import platformdirs
-from packaging.version import parse
+import requests
+from ftrack_connect import DEPRECATED_PLUGINS, INCOMPATIBLE_PLUGINS
 from packaging.specifiers import SpecifierSet
-
-
-from ftrack_connect import (
-    INCOMPATIBLE_PLUGINS,
-    DEPRECATED_PLUGINS,
-)
+from packaging.version import parse
 
 logger = logging.getLogger(__name__)
 
@@ -146,9 +141,7 @@ def is_incompatible_plugin(plugin_data):
             )
 
             if parsed_plugin_version not in incompatible_specifier:
-                logger.debug(
-                    f"Version {plugin_data['version']} is compatible."
-                )
+                logger.debug(f"Version {plugin_data['version']} is compatible.")
                 break
             logger.debug(
                 f"{plugin_data['name']} version {plugin_data['version']} is "
@@ -185,9 +178,7 @@ def is_deprecated_plugin(plugin_data):
             )
 
             if parsed_plugin_version not in deprecated_specifier:
-                logger.debug(
-                    f"Version {plugin_data['version']} is compatible."
-                )
+                logger.debug(f"Version {plugin_data['version']} is compatible.")
                 return False
             logger.debug(
                 f"{plugin_data['name']} version {plugin_data['version']} is "
@@ -222,9 +213,7 @@ def fetch_github_releases(url, latest=True, prereleases=False):
     version of each plugin is returned. If *prereleases* is True,
     prereleases are included in the result.'''
 
-    logger.debug(
-        f'Fetching releases from: {url} (pre-releases: {prereleases})'
-    )
+    logger.debug(f'Fetching releases from: {url} (pre-releases: {prereleases})')
 
     response = requests.get(f"{url}/releases")
     if response.status_code != 200:
@@ -336,14 +325,162 @@ def get_platform_identifier():
     return platform
 
 
+def check_connect_version_update(
+    current_version, repo_url=None, skip_prereleases=True
+):
+    '''Check if there's a newer version of ftrack Connect available on GitHub.
+
+    Args:
+        current_version (str): Current version of Connect (e.g., "25.0.1")
+        repo_url (str, optional): GitHub repository URL. Defaults to integrations repo.
+        skip_prereleases (bool): Whether to skip pre-release versions. Defaults to True.
+
+    Returns:
+        dict: Dictionary with update information containing:
+            - has_update (bool): Whether an update is available
+            - latest_version (str): Latest available version
+            - current_version (str): Current version
+            - download_url (str): URL to download the latest version (if available)
+            - message (str): Human-readable message about the update status
+    '''
+    if not repo_url:
+        # Default to the integrations repository
+        repo_url = 'https://api.github.com/repos/it-mana/integrations'
+
+    try:
+        logger.debug(f'Checking for Connect updates from: {repo_url}')
+
+        # Fetch releases from GitHub
+        response = requests.get(f"{repo_url}/releases")
+        if response.status_code != 200:
+            logger.warning(f'Failed to fetch releases from {repo_url}')
+            return {
+                'has_update': False,
+                'latest_version': current_version,
+                'current_version': current_version,
+                'download_url': None,
+                'message': 'Unable to check for updates',
+                'release_notes': '',
+                'release_name': '',
+                'published_at': '',
+            }
+
+        releases = response.json()
+        latest_connect_release = None
+
+        # Look for the latest Connect release
+        for release in releases:
+            tag_name = release.get('tag_name', '')
+
+            # Skip draft releases
+            if release.get('draft', False):
+                continue
+
+            # Skip prereleases if requested
+            if skip_prereleases and release.get('prerelease', False):
+                continue
+
+            # Check if this is a Connect release (format: connect/vX.X.X)
+            if tag_name.startswith('connect/v'):
+                latest_connect_release = release
+                break
+
+        if not latest_connect_release:
+            logger.debug('No Connect releases found')
+            return {
+                'has_update': False,
+                'latest_version': current_version,
+                'current_version': current_version,
+                'download_url': None,
+                'message': 'No Connect releases found',
+                'release_notes': '',
+                'release_name': '',
+                'published_at': '',
+            }
+
+        # Extract version from tag (connect/vX.X.X -> X.X.X)
+        latest_tag = latest_connect_release['tag_name']
+        latest_version = latest_tag.replace('connect/v', '')
+
+        # Compare versions
+        try:
+            current_parsed = parse(current_version)
+            latest_parsed = parse(latest_version)
+
+            has_update = latest_parsed > current_parsed
+
+            # Find download URL from assets (look for zip files)
+            download_url = None
+            assets = latest_connect_release.get('assets', [])
+
+            for asset in assets:
+                asset_name = asset.get('name', '').lower()
+                if (
+                    asset_name.endswith('.zip')
+                    or asset_name.endswith('.dmg')
+                    or asset_name.endswith('.exe')
+                ):
+                    # Try to match platform
+                    platform = get_platform_identifier()
+                    if platform in asset_name or 'universal' in asset_name:
+                        download_url = asset.get('browser_download_url')
+                        break
+
+            # If no platform-specific download found, use the first available
+            if not download_url and assets:
+                download_url = assets[0].get('browser_download_url')
+
+            if has_update:
+                message = f'A newer version of ftrack Connect is available: v{latest_version} (current: v{current_version})'
+            else:
+                message = f'ftrack Connect is up to date (v{current_version})'
+
+            return {
+                'has_update': has_update,
+                'latest_version': latest_version,
+                'current_version': current_version,
+                'download_url': download_url,
+                'message': message,
+                'release_notes': latest_connect_release.get('body', ''),
+                'release_name': latest_connect_release.get(
+                    'name', f'v{latest_version}'
+                ),
+                'published_at': latest_connect_release.get('published_at', ''),
+            }
+
+        except Exception as e:
+            logger.warning(f'Error comparing versions: {e}')
+            return {
+                'has_update': False,
+                'latest_version': current_version,
+                'current_version': current_version,
+                'download_url': None,
+                'message': f'Error checking version: {e}',
+                'release_notes': '',
+                'release_name': '',
+                'published_at': '',
+            }
+
+    except Exception as e:
+        logger.warning(f'Error checking for Connect updates: {e}')
+        return {
+            'has_update': False,
+            'latest_version': current_version,
+            'current_version': current_version,
+            'download_url': None,
+            'message': f'Unable to check for updates: {e}',
+            'release_notes': '',
+            'release_name': '',
+            'published_at': '',
+        }
+
+
 def create_target_plugin_directory(directory):
     if not os.path.exists(directory):
         # Create directory if not existing.
         try:
             os.makedirs(directory)
         except Exception as e:
-            raise Exception(
-                f"Couldn't create the target plugin directory: {e}"
-            )
+            raise Exception(f"Couldn't create the target plugin directory: {e}")
 
     return directory

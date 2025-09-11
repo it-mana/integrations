@@ -1,44 +1,46 @@
 # :coding: utf-8
 # :copyright: Copyright (c) 2014-2023 ftrack
 
-import sys
-import platformdirs
 import argparse
-import logging
-import signal
-import os
 import importlib
+import logging
+import os
+import signal
+import sys
 
+import platformdirs
 from ftrack_connect.utils.plugin import (
-    create_target_plugin_directory,
     PLUGIN_DIRECTORIES,
+    check_connect_version_update,
+    create_target_plugin_directory,
 )
 
 
 def main_connect(arguments=None):
     '''Launch ftrack connect.'''
 
+    # Variable to store update information to show after Qt app is created
+    _pending_update_info = None
+
     bindings = ['PySide2']
     os.environ.setdefault('QT_PREFERRED_BINDING', os.pathsep.join(bindings))
 
     try:
-        from PySide6 import QtWidgets, QtCore
+        from PySide6 import QtCore, QtWidgets
 
         is_pyside2 = False
     except ImportError:
-        from PySide2 import QtWidgets, QtCore
+        from PySide2 import QtCore, QtWidgets
 
         is_pyside2 = True
 
-    from ftrack_connect import load_fonts_resource
-    import ftrack_connect.utils.log
-    import ftrack_connect.singleton
-
     # Bootstrap hooks
     import ftrack_connect.hook
-
+    import ftrack_connect.singleton
     import ftrack_connect.ui.application
     import ftrack_connect.ui.theme
+    import ftrack_connect.utils.log
+    from ftrack_connect import load_fonts_resource
 
     parser = argparse.ArgumentParser(prog='ftrack-connect')
 
@@ -85,11 +87,48 @@ def main_connect(arguments=None):
         action='store_true',
     )
 
+    parser.add_argument(
+        '--skip-version-check',
+        help='Skip checking for newer Connect versions on startup.',
+        action='store_true',
+    )
+
     namespace = parser.parse_args(arguments)
 
     ftrack_connect.utils.log.configure_logging(
         'ftrack_connect', level=loggingLevels[namespace.verbosity]
     )
+
+    # Check for Connect updates unless skipped
+    if not namespace.skip_version_check:
+        logger = logging.getLogger('ftrack_connect')
+        try:
+            from ftrack_connect import __version__
+
+            logger.debug(
+                f'Checking for Connect updates (current version: {__version__})'
+            )
+
+            update_info = check_connect_version_update(__version__)
+
+            if update_info['has_update']:
+                logger.warning(update_info['message'])
+
+                # Only prompt user if not in silent mode
+                if not namespace.silent:
+                    # Store update info to show dialog after Qt application is created
+                    _pending_update_info = update_info
+                else:
+                    # In silent mode, just log the warning but continue
+                    logger.info(
+                        f'Update available but running in silent mode: {update_info["message"]}'
+                    )
+            else:
+                logger.debug(update_info['message'])
+
+        except Exception as e:
+            logger.debug(f'Error checking for updates: {e}')
+            # Don't block startup on update check failures
 
     # Make sure plugin directory is created
     create_target_plugin_directory(PLUGIN_DIRECTORIES[0])
@@ -161,6 +200,66 @@ def main_connect(arguments=None):
 
     if namespace.silent:
         connectWindow.hide()
+
+    _pending_update_info = {
+        'has_update': True,
+        'latest_version': '25.0.0',
+        'current_version': '24.0.0',
+        'download_url': 'https://github.com/it-mana/integrations/releases/download/connect/v25.0.0/ftrack-25.0.0-macOS.dmg',
+        'message': 'ftrack Connect is up to date (v25.0.0)',
+        'release_notes': 'First MacOS and Windows packages.',
+        'release_name': 'Ftrack Connect v25.0.0',
+        'published_at': '2025-09-06T18:40:50Z',
+    }
+
+    # Show update dialog if there's a pending update
+    if _pending_update_info:
+
+        try:
+            from ftrack_connect.ui.update_dialog import show_update_dialog
+
+            user_choice = show_update_dialog(
+                _pending_update_info, connectWindow
+            )
+
+            if user_choice == 'auto_updated':
+                # User chose automatic update and it's ready to install
+                logger.info(
+                    'Update ready for installation. Exiting ftrack Connect...'
+                )
+                print(
+                    "Update ready for installation. Exiting ftrack Connect..."
+                )
+
+                # Close the Connect window properly
+                connectWindow.close()
+                application.quit()
+
+                # Exit the process to allow the deferred installer to run
+                sys.exit(0)
+            elif user_choice == 'manual_download':
+                # User chose manual download, browser should be open
+                logger.info('User chose manual download')
+            elif user_choice == 'manual_install':
+                # Download completed but installation failed, folder opened
+                logger.info('Download completed, user will install manually')
+            elif user_choice == 'skip':
+                # User chose to skip this version
+                logger.info(
+                    f'User chose to skip version {_pending_update_info["latest_version"]}'
+                )
+            else:
+                # User chose to continue with current version
+                logger.info('User chose to continue with current version')
+
+        except Exception as e:
+            logger.warning(f'Error showing update dialog: {e}')
+            # Fall back to console prompt if dialog fails
+            print(f"\n⚠️  {_pending_update_info['message']}")
+            print(f"📥 Download the latest version from GitHub releases")
+            if _pending_update_info['download_url']:
+                print(f"🔗 {_pending_update_info['download_url']}")
+            print("Continuing with current version...")
 
     # Fix for Windows where font size is incorrect for some widgets. For some
     # reason, resetting the font here solves the sizing issue.
