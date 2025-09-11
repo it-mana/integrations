@@ -205,7 +205,7 @@ def main_connect(arguments=None):
         'has_update': True,
         'latest_version': '25.0.0',
         'current_version': '24.0.0',
-        'download_url': 'https://github.com/it-mana/integrations/releases/download/connect/v25.0.0/ftrack-25.0.0-macOS.dmg',
+        'download_url': 'https://github.com/it-mana/integrations/releases/download/connect/v25.0.0/ftrack-25.0.0-win64.exe',
         'message': 'ftrack Connect is up to date (v25.0.0)',
         'release_notes': 'First MacOS and Windows packages.',
         'release_name': 'Ftrack Connect v25.0.0',

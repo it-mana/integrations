@@ -359,7 +359,6 @@ def check_connect_version_update(
                 'latest_version': current_version,
                 'current_version': current_version,
                 'download_url': None,
-                'download_urls': {},
                 'message': 'Unable to check for updates',
                 'release_notes': '',
                 'release_name': '',
@@ -393,7 +392,6 @@ def check_connect_version_update(
                 'latest_version': current_version,
                 'current_version': current_version,
                 'download_url': None,
-                'download_urls': {},
                 'message': 'No Connect releases found',
                 'release_notes': '',
                 'release_name': '',
@@ -411,59 +409,26 @@ def check_connect_version_update(
 
             has_update = latest_parsed > current_parsed
 
-            # Find download URLs from assets for all platforms
+            # Find download URL from assets (look for zip files)
             download_url = None
-            download_urls = {}
             assets = latest_connect_release.get('assets', [])
 
             for asset in assets:
                 asset_name = asset.get('name', '').lower()
-                asset_url = asset.get('browser_download_url')
-
-                if not asset_url:
-                    continue
-
-                # Categorize assets by platform based on filename and extension
                 if (
-                    asset_name.endswith('.dmg')
-                    or 'mac' in asset_name
-                    or 'darwin' in asset_name
-                    or 'macos' in asset_name
+                    asset_name.endswith('.zip')
+                    or asset_name.endswith('.dmg')
+                    or asset_name.endswith('.exe')
                 ):
-                    download_urls['macos'] = asset_url
-                elif (
-                    asset_name.endswith('.exe')
-                    or asset_name.endswith('.msi')
-                    or 'win' in asset_name
-                    or 'windows' in asset_name
-                ):
-                    download_urls['windows'] = asset_url
-                elif (
-                    asset_name.endswith('.tar.gz')
-                    or asset_name.endswith('.deb')
-                    or asset_name.endswith('.rpm')
-                    or asset_name.endswith('.appimage')
-                    or 'linux' in asset_name
-                ):
-                    download_urls['linux'] = asset_url
-                elif 'universal' in asset_name or asset_name.endswith('.zip'):
-                    # Universal or zip files can be used as fallback
-                    if 'universal' not in download_urls:
-                        download_urls['universal'] = asset_url
+                    # Try to match platform
+                    platform = get_platform_identifier()
+                    if platform in asset_name or 'universal' in asset_name:
+                        download_url = asset.get('browser_download_url')
+                        break
 
-            # Select the appropriate download URL for current platform
-            current_platform = get_platform_identifier()
-            if current_platform == 'mac' and 'macos' in download_urls:
-                download_url = download_urls['macos']
-            elif current_platform == 'windows' and 'windows' in download_urls:
-                download_url = download_urls['windows']
-            elif current_platform == 'linux' and 'linux' in download_urls:
-                download_url = download_urls['linux']
-            elif 'universal' in download_urls:
-                download_url = download_urls['universal']
-            elif download_urls:
-                # Fallback to first available download
-                download_url = list(download_urls.values())[0]
+            # If no platform-specific download found, use the first available
+            if not download_url and assets:
+                download_url = assets[0].get('browser_download_url')
 
             if has_update:
                 message = f'A newer version of ftrack Connect is available: v{latest_version} (current: v{current_version})'
@@ -475,7 +440,6 @@ def check_connect_version_update(
                 'latest_version': latest_version,
                 'current_version': current_version,
                 'download_url': download_url,
-                'download_urls': download_urls,  # All platform-specific URLs
                 'message': message,
                 'release_notes': latest_connect_release.get('body', ''),
                 'release_name': latest_connect_release.get(
@@ -491,7 +455,6 @@ def check_connect_version_update(
                 'latest_version': current_version,
                 'current_version': current_version,
                 'download_url': None,
-                'download_urls': {},
                 'message': f'Error checking version: {e}',
                 'release_notes': '',
                 'release_name': '',
@@ -505,7 +468,6 @@ def check_connect_version_update(
             'latest_version': current_version,
             'current_version': current_version,
             'download_url': None,
-            'download_urls': {},
             'message': f'Unable to check for updates: {e}',
             'release_notes': '',
             'release_name': '',

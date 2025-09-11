@@ -356,92 +356,6 @@ class UpdateDialog:
 
         return '\n'.join(bullet_points[:5])  # Limit to 5 items
 
-    def _get_platform_specific_download_url(self):
-        '''Get the appropriate download URL for the current platform.
-
-        Returns:
-            str: Platform-specific download URL, or None if not found
-        '''
-        system = platform.system().lower()
-        logger.info(f'Getting platform-specific download URL for: {system}')
-
-        # If we have platform-specific URLs in update_info
-        if 'download_urls' in self.update_info:
-            platform_urls = self.update_info['download_urls']
-            logger.info(f'Available platform URLs: {platform_urls}')
-            if system == 'darwin' and 'macos' in platform_urls:
-                logger.info(f'Using macOS URL: {platform_urls["macos"]}')
-                return platform_urls['macos']
-            elif system == 'windows' and 'windows' in platform_urls:
-                logger.info(f'Using Windows URL: {platform_urls["windows"]}')
-                return platform_urls['windows']
-            elif system == 'linux' and 'linux' in platform_urls:
-                logger.info(f'Using Linux URL: {platform_urls["linux"]}')
-                return platform_urls['linux']
-
-        # Fallback: try to modify the single download_url for platform
-        base_url = self.update_info.get('download_url', '')
-        logger.info(f'Fallback base URL: {base_url}')
-        if not base_url:
-            return None
-
-        # Try to detect and replace platform-specific parts in the URL
-        if system == 'windows':
-            # Replace platform-specific filename patterns for Windows
-            if 'macOS' in base_url:
-                # Replace macOS filename pattern with Windows pattern
-                modified_url = base_url.replace('macOS', 'win64')
-                logger.info(
-                    f'Modified URL for Windows (macOS->win64): {modified_url}'
-                )
-                return modified_url
-            elif base_url.endswith('.dmg'):
-                # Replace .dmg extension with .exe
-                modified_url = base_url.replace('.dmg', '.exe')
-                logger.info(
-                    f'Modified URL for Windows (.dmg->.exe): {modified_url}'
-                )
-                return modified_url
-            elif 'darwin' in base_url:
-                # Replace darwin with win64
-                modified_url = base_url.replace('darwin', 'win64')
-                logger.info(
-                    f'Modified URL for Windows (darwin->win64): {modified_url}'
-                )
-                return modified_url
-
-        elif system == 'linux':
-            # Replace platform-specific filename patterns for Linux
-            if 'macOS' in base_url:
-                # Replace macOS filename pattern with Linux pattern
-                modified_url = base_url.replace('macOS', 'linux').replace(
-                    '.dmg', '.tar.gz'
-                )
-                logger.info(f'Modified URL for Linux: {modified_url}')
-                return modified_url
-            elif base_url.endswith('.dmg'):
-                # Replace .dmg extension with .tar.gz
-                modified_url = base_url.replace('.dmg', '.tar.gz')
-                logger.info(
-                    f'Modified URL for Linux (.dmg->.tar.gz): {modified_url}'
-                )
-                return modified_url
-            elif 'darwin' in base_url:
-                # Replace darwin with linux
-                modified_url = base_url.replace('darwin', 'linux')
-                logger.info(
-                    f'Modified URL for Linux (darwin->linux): {modified_url}'
-                )
-                return modified_url
-
-        elif system == 'darwin':
-            # For macOS, ensure .dmg extension
-            if not base_url.endswith('.dmg'):
-                base_url = base_url.rstrip('/') + '.dmg'
-
-        logger.info(f'Final URL for {system}: {base_url}')
-        return base_url
-
     def _on_auto_update_clicked(self):
         '''Handle automatic update button click.'''
         if not self.update_info.get('download_url'):
@@ -459,12 +373,7 @@ class UpdateDialog:
         progress_dialog.show()
 
         # Create temporary file for download
-        download_url = self._get_platform_specific_download_url()
-        if not download_url:
-            # No platform-specific URL found, fallback to manual download
-            self._on_manual_download_clicked()
-            return
-
+        download_url = self.update_info['download_url']
         file_extension = os.path.splitext(download_url)[1]
         if not file_extension:
             # Guess extension based on platform
@@ -567,9 +476,7 @@ class UpdateDialog:
 
                     result = msg_box.exec_()
 
-                    # Log the download details for debugging
-                    logger.info(f'Downloaded installer: {temp_file.name}')
-                    logger.info(f'Download URL was: {download_url}')
+                    print(temp_file.name)
 
                     # Only proceed with installation if user clicked the install button
                     if msg_box.clickedButton() == install_button:
@@ -756,8 +663,9 @@ if "%ERRORLEVEL%"=="0" (
 )
 
 echo Installing Ftrack update...
-start "" "{installer_path}"
-echo Update installer opened. Please follow the installation instructions.
+REM Execute the installer directly
+"{installer_path}"
+echo Update installer has been launched.
 '''
 
                 # Write the script to a temporary file
