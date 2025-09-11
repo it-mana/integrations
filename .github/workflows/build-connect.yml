@@ -56,7 +56,7 @@ jobs:
   connect-build:
     name: Build Connect
     needs: set-variables
-    runs-on: self-hosted-mac # Temporary setting macos-12 as OS instead of UBUNTU because python 6.6 onward has problems building resources on linux. (6.5 works but increases connect file size to double)
+    runs-on: macos-13 # Temporary setting macos-12 as OS instead of UBUNTU because python 6.6 onward has problems building resources on linux. (6.5 works but increases connect file size to double)
     outputs:
       connect_version: ${{ steps.get_version.outputs.connect_version }}
     steps:
@@ -156,7 +156,7 @@ jobs:
   installer-macos:
     name: Build Connect Installer on MacOs
     needs: [set-variables, connect-build]
-    runs-on: self-hosted-mac
+    runs-on: macos-13
     env:
       CODESIGN: "True" # A not codesigned dmg will always show damaged app. Please build locally if don't want to codesign and generate a ZIP instead of a dmg.
     steps:
@@ -185,12 +185,36 @@ jobs:
       - name: Codesign app bundle
         if: env.CODESIGN == 'True'
         env:
+          MACOS_CERTIFICATE: ${{ secrets.PROD_MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PWD: ${{ secrets.PROD_MACOS_CERTIFICATE_PWD }}
           MACOS_CERTIFICATE_NAME: ${{ secrets.PROD_MACOS_CERTIFICATE_NAME }}
+          MACOS_CI_KEYCHAIN_PWD: ${{ secrets.PROD_MACOS_CI_KEYCHAIN_PWD }}
 
           PROD_MACOS_NOTARIZATION_APPLE_ID: ${{ secrets.PROD_MACOS_NOTARIZATION_APPLE_ID }}
           PROD_MACOS_NOTARIZATION_TEAM_ID: ${{ secrets.PROD_MACOS_NOTARIZATION_TEAM_ID }}
           PROD_MACOS_NOTARIZATION_PWD: ${{ secrets.PROD_MACOS_NOTARIZATION_PWD }}
         run: |
+          # Turn our base64-encoded certificate back to a regular .p12 file
+          echo $MACOS_CERTIFICATE | base64 --decode > certificate.p12
+
+          # We need to create a new keychain, otherwise using the certificate will prompt
+          # with a UI dialog asking for the certificate password, which we can't
+          # use in a headless CI environment
+          security create-keychain -p "$MACOS_CI_KEYCHAIN_PWD" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$MACOS_CI_KEYCHAIN_PWD" build.keychain
+          security import certificate.p12 -k build.keychain -P "$MACOS_CERTIFICATE_PWD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$MACOS_CI_KEYCHAIN_PWD" build.keychain
+
+          # Verify certificate
+          echo "Verify certificate: "
+          security find-identity -v
+
+
+          # Create keychain credentials
+          echo "Create keychain profile to notarize"
+          xcrun notarytool store-credentials "notarytool-profile" --apple-id "$PROD_MACOS_NOTARIZATION_APPLE_ID" --team-id "$PROD_MACOS_NOTARIZATION_TEAM_ID" --password "$PROD_MACOS_NOTARIZATION_PWD"
+
           # Build the installer and codesign
           cd ${{ needs.set-variables.outputs.folder }}
           poetry install --with installer --sync
