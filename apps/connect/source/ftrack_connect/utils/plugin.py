@@ -141,7 +141,9 @@ def is_incompatible_plugin(plugin_data):
             )
 
             if parsed_plugin_version not in incompatible_specifier:
-                logger.debug(f"Version {plugin_data['version']} is compatible.")
+                logger.debug(
+                    f"Version {plugin_data['version']} is compatible."
+                )
                 break
             logger.debug(
                 f"{plugin_data['name']} version {plugin_data['version']} is "
@@ -178,7 +180,9 @@ def is_deprecated_plugin(plugin_data):
             )
 
             if parsed_plugin_version not in deprecated_specifier:
-                logger.debug(f"Version {plugin_data['version']} is compatible.")
+                logger.debug(
+                    f"Version {plugin_data['version']} is compatible."
+                )
                 return False
             logger.debug(
                 f"{plugin_data['name']} version {plugin_data['version']} is "
@@ -213,7 +217,9 @@ def fetch_github_releases(url, latest=True, prereleases=False):
     version of each plugin is returned. If *prereleases* is True,
     prereleases are included in the result.'''
 
-    logger.debug(f'Fetching releases from: {url} (pre-releases: {prereleases})')
+    logger.debug(
+        f'Fetching releases from: {url} (pre-releases: {prereleases})'
+    )
 
     response = requests.get(f"{url}/releases")
     if response.status_code != 200:
@@ -315,9 +321,9 @@ def get_platform_identifier():
     '''Return platform identifier for current platform, used in plugin package
     filenames'''
     if sys.platform.startswith('win'):
-        platform = 'windows'
+        platform = 'win64'
     elif sys.platform.startswith('darwin'):
-        platform = 'mac'
+        platform = 'macOS'
     elif sys.platform.startswith('linux'):
         platform = 'linux'
     else:
@@ -481,6 +487,8 @@ def create_target_plugin_directory(directory):
         try:
             os.makedirs(directory)
         except Exception as e:
-            raise Exception(f"Couldn't create the target plugin directory: {e}")
+            raise Exception(
+                f"Couldn't create the target plugin directory: {e}"
+            )
 
     return directory
