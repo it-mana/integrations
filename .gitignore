@@ -65,3 +65,6 @@ apps/connect/source/ftrack_connect/ui/resource.py
 
 # Ignore specific CSS files in the connect app
 apps/connect/resource/style_*.css
+
+# Ignore release script
+release.sh
