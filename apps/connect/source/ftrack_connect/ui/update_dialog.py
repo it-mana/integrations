@@ -387,29 +387,53 @@ class UpdateDialog:
 
         # Try to detect and replace platform-specific parts in the URL
         if system == 'windows':
-            # Replace .dmg with .exe for Windows
-            if base_url.endswith('.dmg'):
-                modified_url = base_url.replace('.dmg', '.exe')
-                logger.info(f'Modified URL for Windows: {modified_url}')
+            # Replace platform-specific filename patterns for Windows
+            if 'macOS' in base_url:
+                # Replace macOS filename pattern with Windows pattern
+                modified_url = base_url.replace('macOS', 'win64')
+                logger.info(
+                    f'Modified URL for Windows (macOS->win64): {modified_url}'
+                )
                 return modified_url
-            # Look for macOS-specific patterns and replace with Windows
-            base_url = base_url.replace('macos', 'windows').replace(
-                'darwin', 'windows'
-            )
-            if not base_url.endswith(('.exe', '.msi')):
-                # Add .exe extension if no Windows extension found
-                base_url = base_url.rstrip('/') + '.exe'
+            elif base_url.endswith('.dmg'):
+                # Replace .dmg extension with .exe
+                modified_url = base_url.replace('.dmg', '.exe')
+                logger.info(
+                    f'Modified URL for Windows (.dmg->.exe): {modified_url}'
+                )
+                return modified_url
+            elif 'darwin' in base_url:
+                # Replace darwin with win64
+                modified_url = base_url.replace('darwin', 'win64')
+                logger.info(
+                    f'Modified URL for Windows (darwin->win64): {modified_url}'
+                )
+                return modified_url
+
         elif system == 'linux':
-            # Replace .dmg with appropriate Linux format
-            if base_url.endswith('.dmg'):
-                return base_url.replace('.dmg', '.tar.gz')
-            # Look for macOS-specific patterns and replace with Linux
-            base_url = base_url.replace('macos', 'linux').replace(
-                'darwin', 'linux'
-            )
-            if not base_url.endswith(('.tar.gz', '.deb', '.rpm', '.appimage')):
-                # Add .tar.gz extension if no Linux extension found
-                base_url = base_url.rstrip('/') + '.tar.gz'
+            # Replace platform-specific filename patterns for Linux
+            if 'macOS' in base_url:
+                # Replace macOS filename pattern with Linux pattern
+                modified_url = base_url.replace('macOS', 'linux').replace(
+                    '.dmg', '.tar.gz'
+                )
+                logger.info(f'Modified URL for Linux: {modified_url}')
+                return modified_url
+            elif base_url.endswith('.dmg'):
+                # Replace .dmg extension with .tar.gz
+                modified_url = base_url.replace('.dmg', '.tar.gz')
+                logger.info(
+                    f'Modified URL for Linux (.dmg->.tar.gz): {modified_url}'
+                )
+                return modified_url
+            elif 'darwin' in base_url:
+                # Replace darwin with linux
+                modified_url = base_url.replace('darwin', 'linux')
+                logger.info(
+                    f'Modified URL for Linux (darwin->linux): {modified_url}'
+                )
+                return modified_url
+
         elif system == 'darwin':
             # For macOS, ensure .dmg extension
             if not base_url.endswith('.dmg'):
