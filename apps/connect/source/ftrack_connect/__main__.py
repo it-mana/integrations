@@ -207,48 +207,13 @@ def main_connect(arguments=None):
         try:
             from ftrack_connect.ui.update_dialog import show_update_dialog
 
-            user_choice = show_update_dialog(
+            show_update_dialog(
                 _pending_update_info, connectWindow
             )
 
-            if user_choice == 'auto_updated':
-                # User chose automatic update and it's ready to install
-                logger.info(
-                    'Update ready for installation. Exiting ftrack Connect...'
-                )
-                print(
-                    "Update ready for installation. Exiting ftrack Connect..."
-                )
-
-                # Close the Connect window properly
-                connectWindow.close()
-                application.quit()
-
-                # Exit the process to allow the deferred installer to run
-                sys.exit(0)
-            elif user_choice == 'manual_download':
-                # User chose manual download, browser should be open
-                logger.info('User chose manual download')
-            elif user_choice == 'manual_install':
-                # Download completed but installation failed, folder opened
-                logger.info('Download completed, user will install manually')
-            elif user_choice == 'skip':
-                # User chose to skip this version
-                logger.info(
-                    f'User chose to skip version {_pending_update_info["latest_version"]}'
-                )
-            else:
-                # User chose to continue with current version
-                logger.info('User chose to continue with current version')
-
         except Exception as e:
             logger.warning(f'Error showing update dialog: {e}')
-            # Fall back to console prompt if dialog fails
-            print(f"\n⚠️  {_pending_update_info['message']}")
-            print(f"📥 Download the latest version from GitHub releases")
-            if _pending_update_info['download_url']:
-                print(f"🔗 {_pending_update_info['download_url']}")
-            print("Continuing with current version...")
+
 
     # Fix for Windows where font size is incorrect for some widgets. For some
     # reason, resetting the font here solves the sizing issue.

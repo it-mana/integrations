@@ -4,6 +4,7 @@ import platform
 import traceback
 import qtawesome as qta
 import os
+import logging
 
 try:
     from PySide6 import QtWidgets, QtCore, QtGui
@@ -23,6 +24,8 @@ from ftrack_connect.plugin_manager.overlay import InstallerBlockingOverlay
 from ftrack_connect.plugin_manager.processor import PluginProcessor, ROLES
 from ftrack_connect.plugin_manager.plugin_list import DndPluginList
 from ftrack_connect.plugin_manager.welcome import WelcomeDialog
+
+logger = logging.getLogger(__name__)
 
 
 class PluginManager(ftrack_connect.ui.application.ConnectWidget):
@@ -227,7 +230,7 @@ class PluginManager(ftrack_connect.ui.application.ConnectWidget):
         self._enable_apply_button(None)
         self._reset_plugin_list()
         self.refresh_done.emit()
-        self._initialised = True
+        self._initialised = False
 
     def _on_plugin_fetch_callback(self, plugins):
         '''Callback on fetching installed plugins from Connect'''
@@ -236,6 +239,10 @@ class PluginManager(ftrack_connect.ui.application.ConnectWidget):
         self._plugin_list_widget.populate_download_plugins(
             self._select_release_type_widget.isChecked()
         )
+        
+        # Check for auto-install/update regardless of how many plugins are installed
+        self._check_and_run_auto_operations()
+        
         if (
             not self._initialised
             and len(self._plugin_list_widget.installed_plugins) == 0
@@ -248,6 +255,51 @@ class PluginManager(ftrack_connect.ui.application.ConnectWidget):
                     self._plugin_list_widget.downloadable_plugin_count
                 )
 
+    def _check_and_run_auto_operations(self):
+        '''Check if auto-install or auto-update is enabled and run them.'''
+        # Only run auto operations once per session
+        if self._initialised:
+            return
+            
+        # Check if auto-install or auto-update is enabled via environment variable
+        auto_install = "true"
+        auto_update = "true"
+
+        if auto_install in ['true', '1', 'yes'] or auto_update in ['true', '1', 'yes']:
+            downloadable_plugin_count = self._plugin_list_widget.downloadable_plugin_count
+            
+            if auto_install in ['true', '1', 'yes']:
+                logger.info(f'Auto-installing {downloadable_plugin_count} available plugins...')
+            
+            if auto_update in ['true', '1', 'yes']:
+                update_count = self._count_plugin_updates()
+                logger.info(f'Auto-updating {update_count} plugins with newer versions...')
+            
+            # Only proceed if there are plugins to process
+            total_to_process = self._count_plugins_to_process(
+                auto_install in ['true', '1', 'yes'], 
+                auto_update in ['true', '1', 'yes']
+            )
+            
+            if total_to_process > 0:
+                logger.info(f'Starting auto-processing of {total_to_process} plugins...')
+                
+                # Automatically install/update all plugins
+                def plugin_processed_callback(index, total, action, plugin_info):
+                    logger.info(f'{action} {index}/{total} plugins: {plugin_info}')
+                
+                self._on_auto_install_update_callback(
+                    plugin_processed_callback, 
+                    auto_install in ['true', '1', 'yes'], 
+                    auto_update in ['true', '1', 'yes']
+                )
+                logger.info('Auto-installation/update of plugins completed')
+            else:
+                logger.info('No plugins to auto-install or auto-update.')
+        
+        # Mark as initialized to prevent running auto operations again
+        self._initialised = True
+
     def _on_show_welcome_callback(self, downloadable_plugin_count):
         # Show dialog were user can choose to install all available plugins
         # Execute dialog and evaluate response
@@ -258,6 +310,32 @@ class PluginManager(ftrack_connect.ui.application.ConnectWidget):
                 'Plugin Manager',
                 'No plugins installed and no downloadable plugins found! Please check your configuration.',
             )
+            return
+
+        # Check if auto-install or auto-update is enabled via environment variable
+        # auto_install = os.environ.get('FTRACK_CONNECT_AUTO_INSTALL_PLUGINS', '').lower()
+        # auto_update = os.environ.get('FTRACK_CONNECT_AUTO_UPDATE_PLUGINS', '').lower()
+        auto_install = "true"
+        auto_update = "true"
+
+        if auto_install in ['true', '1', 'yes'] or auto_update in ['true', '1', 'yes']:
+            if auto_install in ['true', '1', 'yes']:
+                logger.info(f'Auto-installing {downloadable_plugin_count} available plugins...')
+            
+            if auto_update in ['true', '1', 'yes']:
+                update_count = self._count_plugin_updates()
+                logger.info(f'Auto-updating {update_count} plugins with newer versions...')
+            
+            # Automatically install/update all plugins without showing the welcome dialog
+            def plugin_processed_callback(index, total, action, plugin_info):
+                logger.info(f'{action} {index}/{total} plugins: {plugin_info}')
+            
+            self._on_auto_install_update_callback(
+                plugin_processed_callback, 
+                auto_install in ['true', '1', 'yes'], 
+                auto_update in ['true', '1', 'yes']
+            )
+            logger.info('Auto-installation/update of plugins completed')
             return
 
         self._label.setVisible(False)
@@ -284,6 +362,162 @@ class PluginManager(ftrack_connect.ui.application.ConnectWidget):
             self._plugin_processor.process(item)
             on_plugin_installed_callback(i + 1)
         self._reset_plugin_list()
+
+    def _count_plugin_updates(self):
+        '''Count how many plugins have newer versions available.'''
+        update_count = 0
+        num_items = self._plugin_list_widget.plugin_model.rowCount()
+        
+        for i in range(num_items):
+            item = self._plugin_list_widget.plugin_model.item(i)
+            status = item.data(ROLES.PLUGIN_STATUS)
+            
+            # Count UPDATE status plugins
+            if status == 2:  # STATUSES.UPDATE
+                update_count += 1
+        
+        return update_count
+
+    def _count_plugins_to_process(self, do_install, do_update):
+        '''Count how many plugins will be processed with the given settings.'''
+        from ftrack_connect.plugin_manager.processor import STATUSES
+        
+        count = 0
+        num_items = self._plugin_list_widget.plugin_model.rowCount()
+        
+        for i in range(num_items):
+            item = self._plugin_list_widget.plugin_model.item(i)
+            status = item.data(ROLES.PLUGIN_STATUS)
+            
+            if status == STATUSES.NEW and do_install:
+                count += 1
+            elif status == STATUSES.UPDATE and do_update:
+                count += 1
+            elif status == STATUSES.DOWNLOAD:
+                if do_install:  # DOWNLOAD status treated as new install
+                    count += 1
+        
+        return count
+
+    def _is_newer_version(self, available_version, installed_version):
+        '''Compare version strings to determine if available version is newer.
+        
+        Args:
+            available_version (str): Version available for download
+            installed_version (str): Currently installed version
+            
+        Returns:
+            bool: True if available version is newer
+        '''
+        try:
+            from packaging.version import parse as parse_version
+            return parse_version(str(available_version)) > parse_version(str(installed_version))
+        except Exception:
+            # Fallback to string comparison if packaging is not available
+            return str(available_version) > str(installed_version)
+
+    def _on_auto_install_update_callback(self, on_plugin_processed_callback, do_install=True, do_update=True):
+        '''Automatically install new plugins and/or update existing ones.
+        
+        Args:
+            on_plugin_processed_callback: Callback function for progress updates
+            do_install (bool): Whether to install new plugins
+            do_update (bool): Whether to update existing plugins
+        '''
+        from ftrack_connect.plugin_manager.processor import STATUSES
+        
+        num_items = self._plugin_list_widget.plugin_model.rowCount()
+        processed_count = 0
+        
+        # Get plugins to process
+        plugins_to_process = []
+        
+        for i in range(num_items):
+            item = self._plugin_list_widget.plugin_model.item(i)
+            status = item.data(ROLES.PLUGIN_STATUS)
+            plugin_name = item.data(ROLES.PLUGIN_NAME)
+            available_version = item.data(ROLES.PLUGIN_VERSION)
+            
+            # Determine what action to take
+            action = None
+            version_info = f'v{available_version}'
+            
+            if status == STATUSES.NEW and do_install:
+                action = 'Installing'
+                plugins_to_process.append((item, action, plugin_name, version_info))
+            elif status == STATUSES.UPDATE and do_update:
+                action = 'Updating'
+                # For updates, try to get the current version info
+                for installed_plugin in self._installed_plugins:
+                    if installed_plugin['name'] == plugin_name:
+                        installed_version = installed_plugin.get('version', '0.0.0')
+                        version_info = f'{installed_version} -> {available_version}'
+                        break
+                plugins_to_process.append((item, action, plugin_name, version_info))
+            elif status == STATUSES.DOWNLOAD:
+                # DOWNLOAD status could be either new or update depending on do_install/do_update
+                if do_install:
+                    action = 'Installing'
+                    plugins_to_process.append((item, action, plugin_name, version_info))
+        
+        total_to_process = len(plugins_to_process)
+        
+        if total_to_process == 0:
+            logger.info('No plugins to install or update.')
+            return
+        
+        logger.info(f'Processing {total_to_process} plugins...')
+        
+        # Process the plugins
+        for item, action, plugin_name, version_info in plugins_to_process:
+            try:
+                processed_count += 1
+                logger.info(f'{action} plugin {processed_count}/{total_to_process}: {plugin_name} ({version_info})')
+                
+                # Process the plugin
+                self._plugin_processor.process(item)
+                
+                # Call the progress callback
+                on_plugin_processed_callback(processed_count, total_to_process, action, f'{plugin_name} ({version_info})')
+                
+            except Exception as e:
+                logger.error(f'Failed to {action.lower()} plugin {plugin_name}: {str(e)}')
+                continue
+        
+        self._reset_plugin_list()
+        logger.info(f'Successfully processed {processed_count}/{total_to_process} plugins')
+        
+        # If any plugins were processed, notify user about restart requirement
+        if processed_count > 0:
+            self._show_auto_install_restart_message(processed_count, total_to_process, plugins_to_process)
+
+    def _show_auto_install_restart_message(self, processed_count, total_count, plugins_processed):
+        '''Show restart message after auto-installing/updating plugins.'''
+        
+        # Build the plugin list text
+        plugin_list_text = ""
+        if plugins_processed:
+            plugin_list_text = "\n\nProcessed plugins:\n"
+            for item, action, plugin_name, version_info in plugins_processed:
+                plugin_list_text += f"• {action}: {plugin_name} ({version_info})\n"
+        
+        message_text = (
+            f'Successfully processed {processed_count} of {total_count} plugins.'
+            f'{plugin_list_text}\n'
+            'ftrack Connect needs to restart to load the new plugins.\n\n'
+            'Would you like to restart now?'
+        )
+        
+        msgbox = QtWidgets.QMessageBox(
+            QtWidgets.QMessageBox.Icon.Information,
+            'Plugin Installation Complete',
+            message_text,
+            buttons=QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
+            parent=self,
+        )
+        answer = msgbox.exec_()
+        if answer == QtWidgets.QMessageBox.StandardButton.Yes:
+            self.requestConnectRestart.emit()
 
     def _on_select_release_type_callback(self):
         self._reset_button.click()
